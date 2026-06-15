@@ -1,7 +1,7 @@
 "use client";
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ComposedChart } from "recharts";
-import { DailyMetric } from "@/types/meta";
+interface DailyMetric { date: string; clicks: number; ctr: number; }
 
 interface ClicksChartProps {
   data: DailyMetric[];

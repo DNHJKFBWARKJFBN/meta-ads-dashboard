@@ -1,7 +1,7 @@
 "use client";
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { DailyMetric } from "@/types/meta";
+interface DailyMetric { date: string; spend: number; }
 
 interface SpendChartProps {
   data: DailyMetric[];
