@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { ChevronRight, ChevronUp, ChevronDown, ExternalLink } from "lucide-react";
-import { MetaCampaign, MetaAdSet, MetaAd, insightToMetrics } from "@/types/meta";
+import { MetaCampaign, MetaAdSet, MetaAd, insightToMetrics, getBudgetAmount, isDailyBudget } from "@/types/meta";
 import { useDashboard } from "@/lib/context";
 
 type Level = "campaign" | "adset" | "ad";
@@ -21,13 +21,20 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   ARCHIVED: { label: "보관", cls: "bg-gray-100 text-gray-500" },
 };
 
+function getBudgetLabel(row: MetaCampaign | MetaAdSet | MetaAd): string {
+  const r = row as MetaCampaign | MetaAdSet;
+  const amount = getBudgetAmount(r);
+  if (amount <= 0) return "-";
+  return `$${amount.toLocaleString()}${isDailyBudget(r) ? "/일" : "(총액)"}`;
+}
+
 function SortIcon({ col, sortKey, asc }: { col: SortKey; sortKey: SortKey; asc: boolean }) {
   if (col !== sortKey) return <span className="text-gray-300 ml-1">⇅</span>;
   return asc ? <ChevronUp size={12} className="inline ml-1" /> : <ChevronDown size={12} className="inline ml-1" />;
 }
 
-export default function DrilldownTable() {
-  const { datePreset } = useDashboard();
+export default function DrilldownTable({ activeOnly = false }: { activeOnly?: boolean }) {
+  const { dateParam } = useDashboard();
   const [level, setLevel] = useState<Level>("campaign");
   const [breadcrumb, setBreadcrumb] = useState<{ id: string; name: string; level: Level }[]>([]);
   const [rows, setRows] = useState<(MetaCampaign | MetaAdSet | MetaAd)[]>([]);
@@ -39,7 +46,7 @@ export default function DrilldownTable() {
   const fetchRows = useCallback(async (lvl: Level, parentId?: string) => {
     setLoading(true);
     try {
-      let url = `/api/campaigns?level=${lvl}&date_preset=${datePreset}`;
+      let url = `/api/campaigns?level=${lvl}&${dateParam}&active_only=${activeOnly}`;
       if (lvl === "adset" && parentId) url += `&campaign_id=${parentId}`;
       if (lvl === "ad" && parentId) url += `&adset_id=${parentId}`;
       const res = await fetch(url);
@@ -48,13 +55,13 @@ export default function DrilldownTable() {
     } finally {
       setLoading(false);
     }
-  }, [datePreset]);
+  }, [dateParam, activeOnly]);
 
   useEffect(() => {
     setLevel("campaign");
     setBreadcrumb([]);
     fetchRows("campaign");
-  }, [datePreset, fetchRows]);
+  }, [dateParam, fetchRows]);
 
   function drillDown(row: MetaCampaign | MetaAdSet) {
     const nextLevel: Level = level === "campaign" ? "adset" : "ad";
@@ -93,13 +100,16 @@ export default function DrilldownTable() {
   });
 
   const totals = rows.reduce((acc, row) => {
+    const budget = acc.budget + getBudgetAmount(row as MetaCampaign | MetaAdSet);
     const ins = row.insights?.data?.[0];
-    if (!ins) return acc;
+    if (!ins) return { ...acc, budget };
     const m = insightToMetrics(ins);
-    return { spend: acc.spend + m.spend, revenue: acc.revenue + m.revenue, clicks: acc.clicks + m.clicks, impressions: acc.impressions + m.impressions };
-  }, { spend: 0, revenue: 0, clicks: 0, impressions: 0 });
+    return { spend: acc.spend + m.spend, revenue: acc.revenue + m.revenue, clicks: acc.clicks + m.clicks, impressions: acc.impressions + m.impressions, budget };
+  }, { spend: 0, revenue: 0, clicks: 0, impressions: 0, budget: 0 });
 
   const levelLabel: Record<Level, string> = { campaign: "캠페인", adset: "광고세트", ad: "광고" };
+  const showBudget = level !== "ad";
+  const colCount = 8 + (showBudget ? 1 : 0) + (level !== "campaign" ? 1 : 0);
 
   function Th({ col, label }: { col: SortKey; label: string }) {
     return (
@@ -114,7 +124,7 @@ export default function DrilldownTable() {
       {/* Breadcrumb */}
       <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
         <button onClick={() => navigateTo(-1)} className={`text-sm font-semibold ${level === "campaign" ? "text-gray-800" : "text-indigo-500 hover:underline"}`}>
-          전체
+          광고 데이터
         </button>
         {breadcrumb.map((b, i) => (
           <span key={b.id} className="flex items-center gap-1">
@@ -134,6 +144,11 @@ export default function DrilldownTable() {
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 min-w-[200px]">이름</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">상태</th>
+              {showBudget && (
+                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">
+                  {level === "campaign" ? "캠페인 예산" : "세트 예산"}
+                </th>
+              )}
               <Th col="spend" label="광고비" />
               <Th col="revenue" label="매출" />
               <Th col="roas" label="ROAS" />
@@ -147,7 +162,7 @@ export default function DrilldownTable() {
             {loading ? (
               [...Array(5)].map((_, i) => (
                 <tr key={i} className="border-b border-gray-50">
-                  {[...Array(level === "campaign" ? 8 : 9)].map((__, j) => (
+                  {[...Array(colCount)].map((__, j) => (
                     <td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>
                   ))}
                 </tr>
@@ -181,9 +196,12 @@ export default function DrilldownTable() {
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.cls}`}>{st.label}</span>
                   </td>
+                  {showBudget && (
+                    <td className="px-4 py-3 text-right text-gray-600">{getBudgetLabel(row)}</td>
+                  )}
                   <td className="px-4 py-3 text-right text-gray-700">{m ? `$${m.spend.toFixed(2)}` : "-"}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{m && m.revenue > 0 ? `$${m.revenue.toFixed(0)}` : "-"}</td>
-                  <td className={`px-4 py-3 text-right ${m ? roasBadge(m.roas) : "text-gray-400"}`}>{m && m.roas > 0 ? `${m.roas.toFixed(2)}x` : "-"}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">{m && m.revenue > 0 ? `$${m.revenue.toFixed(2)}` : "-"}</td>
+                  <td className={`px-4 py-3 text-right ${m ? roasBadge(m.roas) : "text-gray-400"}`}>{m && m.roas > 0 ? `${(m.roas * 100).toFixed(0)}%` : "-"}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{m ? m.clicks.toLocaleString() : "-"}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{m ? `${m.ctr.toFixed(2)}%` : "-"}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{m ? m.impressions.toLocaleString() : "-"}</td>
@@ -205,10 +223,13 @@ export default function DrilldownTable() {
               <tr className="bg-gray-50 font-semibold border-t border-gray-200">
                 <td className="px-5 py-3 text-sm text-gray-700">합계</td>
                 <td></td>
+                {showBudget && (
+                  <td className="px-4 py-3 text-right text-gray-800">총 예산 ${totals.budget.toLocaleString()}</td>
+                )}
                 <td className="px-4 py-3 text-right text-gray-800">${totals.spend.toFixed(2)}</td>
-                <td className="px-4 py-3 text-right text-gray-800">{totals.revenue > 0 ? `$${totals.revenue.toFixed(0)}` : "-"}</td>
+                <td className="px-4 py-3 text-right text-gray-800">{totals.revenue > 0 ? `$${totals.revenue.toFixed(2)}` : "-"}</td>
                 <td className={`px-4 py-3 text-right ${roasBadge(totals.spend > 0 ? totals.revenue / totals.spend : 0)}`}>
-                  {totals.spend > 0 && totals.revenue > 0 ? `${(totals.revenue / totals.spend).toFixed(2)}x` : "-"}
+                  {totals.spend > 0 && totals.revenue > 0 ? `${((totals.revenue / totals.spend) * 100).toFixed(0)}%` : "-"}
                 </td>
                 <td className="px-4 py-3 text-right text-gray-800">{totals.clicks.toLocaleString()}</td>
                 <td></td>

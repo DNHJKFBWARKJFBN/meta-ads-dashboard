@@ -23,8 +23,8 @@ export default function RoasChart({ data }: RoasChartProps) {
         <BarChart data={top8} margin={{ top: 5, right: 10, left: 0, bottom: 40 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} angle={-30} textAnchor="end" tickLine={false} />
-          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}x`} />
-          <Tooltip formatter={(v) => [`${Number(v).toFixed(2)}x`, "ROAS"]} />
+          <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(Number(v) * 100).toFixed(0)}%`} />
+          <Tooltip formatter={(v) => [`${(Number(v) * 100).toFixed(0)}%`, "ROAS"]} />
           <Bar dataKey="roas" name="ROAS" radius={[4, 4, 0, 0]}>
             {top8.map((entry, i) => (
               <Cell key={i} fill={roasColor(entry.roas)} />

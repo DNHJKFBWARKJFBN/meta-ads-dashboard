@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"home:%{http_code}\\\\n\" https://meta-ads-dashboard-omega-opal.vercel.app/)",
+      "Bash(curl -s -o /dev/null -w \"meta-bephor:%{http_code}\\\\n\" https://meta-ads-dashboard-omega-opal.vercel.app/meta-bephor)",
+      "Bash(curl -s -o /dev/null -w \"daily-report:%{http_code}\\\\n\" https://meta-ads-dashboard-omega-opal.vercel.app/daily-report)",
+      "Bash(curl -s https://meta-ads-dashboard-omega-opal.vercel.app/api/exchange-rate)",
+      "Bash(curl -s -o /tmp/sheet1.csv -w \"sheet1 status:%{http_code} size:%{size_download}\\\\n\" \"https://docs.google.com/spreadsheets/d/13mGz0351JArLHtoiHNLYP2nXzAIHCBNTMH4pTQMrHRg/export?format=csv&gid=215731879\")",
+      "Bash(curl -s -o /tmp/sheet2.csv -w \"sheet2 status:%{http_code} size:%{size_download}\\\\n\" \"https://docs.google.com/spreadsheets/d/13mGz0351JArLHtoiHNLYP2nXzAIHCBNTMH4pTQMrHRg/export?format=csv&gid=1744030131\")",
+      "Read(//tmp/**)",
+      "Bash(curl -sL -o /tmp/sheet1.csv -w \"sheet1 final status:%{http_code} url:%{url_effective} size:%{size_download}\\\\n\" \"https://docs.google.com/spreadsheets/d/13mGz0351JArLHtoiHNLYP2nXzAIHCBNTMH4pTQMrHRg/export?format=csv&gid=215731879\")",
+      "Bash(curl -sL -o /tmp/sheet2.csv -w \"sheet2 final status:%{http_code} size:%{size_download}\\\\n\" \"https://docs.google.com/spreadsheets/d/13mGz0351JArLHtoiHNLYP2nXzAIHCBNTMH4pTQMrHRg/export?format=csv&gid=1744030131\")"
+    ]
+  }
+}
