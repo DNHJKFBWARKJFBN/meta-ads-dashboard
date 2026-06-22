@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, ChevronDown, Search } from "lucide-react";
+import { Users } from "lucide-react";
+import { useDashboard } from "@/lib/context";
 
 interface BreakdownAction {
   action_type: string;
@@ -33,31 +34,14 @@ const TABS = [
 
 type TabValue = (typeof TABS)[number]["value"];
 
-const DATE_OPTIONS = [
-  { label: "오늘", preset: "today" },
-  { label: "어제", preset: "yesterday" },
-  { label: "최근 7일", preset: "last_7d" },
-  { label: "최근 14일", preset: "last_14d" },
-  { label: "최근 30일", preset: "last_30d" },
-  { label: "이번 달", preset: "this_month" },
-  { label: "지난 달", preset: "last_month" },
-] as const;
-
-type DatePreset = (typeof DATE_OPTIONS)[number]["preset"] | "custom";
-
 interface DemoData {
   ageGender: BreakdownRow[];
   region: BreakdownRow[];
 }
 
 export default function AudienceInsights() {
+  const { dateParam } = useDashboard();
   const [activeTab, setActiveTab] = useState<TabValue>(null);
-  const [datePreset, setDatePreset] = useState<DatePreset>("last_7d");
-  const [customSince, setCustomSince] = useState("");
-  const [customUntil, setCustomUntil] = useState("");
-  const [appliedSince, setAppliedSince] = useState("");
-  const [appliedUntil, setAppliedUntil] = useState("");
-  const [showDateMenu, setShowDateMenu] = useState(false);
   const [cache, setCache] = useState<Record<string, DemoData>>({});
   const [rate, setRate] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,26 +55,14 @@ export default function AudienceInsights() {
   }, []);
 
   useEffect(() => {
-    const isCustom = datePreset === "custom";
-    if (isCustom && (!appliedSince || !appliedUntil)) return;
-
-    const cacheKey = isCustom
-      ? `${activeTab ?? "__all__"}__${appliedSince}_${appliedUntil}`
-      : `${activeTab ?? "__all__"}__${datePreset}`;
-
+    const cacheKey = `${activeTab ?? "__all__"}__${dateParam}`;
     if (cache[cacheKey]) { setLoading(false); return; }
 
     setLoading(true);
     setError(null);
 
-    const qs = new URLSearchParams();
+    const qs = new URLSearchParams(dateParam);
     if (activeTab) qs.set("objective", activeTab);
-    if (isCustom) {
-      qs.set("since", appliedSince);
-      qs.set("until", appliedUntil);
-    } else {
-      qs.set("date_preset", datePreset);
-    }
 
     fetch(`/api/demographics?${qs}`)
       .then((r) => r.json())
@@ -100,11 +72,9 @@ export default function AudienceInsights() {
       })
       .catch(() => setError("데이터 로드 실패"))
       .finally(() => setLoading(false));
-  }, [activeTab, datePreset, appliedSince, appliedUntil, cache]);
+  }, [activeTab, dateParam, cache]);
 
-  const cacheKey = datePreset === "custom"
-    ? `${activeTab ?? "__all__"}__${appliedSince}_${appliedUntil}`
-    : `${activeTab ?? "__all__"}__${datePreset}`;
+  const cacheKey = `${activeTab ?? "__all__"}__${dateParam}`;
   const data = cache[cacheKey];
   const ageGender = data?.ageGender ?? [];
   const region = data?.region ?? [];
@@ -149,88 +119,15 @@ export default function AudienceInsights() {
     return `₩${Math.round(usd * rate).toLocaleString()}`;
   }
 
-  function applyCustom() {
-    if (!customSince || !customUntil) return;
-    setAppliedSince(customSince);
-    setAppliedUntil(customUntil);
-    setShowDateMenu(false);
-  }
-
-  const dateLabel = datePreset === "custom" && appliedSince && appliedUntil
-    ? `${appliedSince} ~ ${appliedUntil}`
-    : DATE_OPTIONS.find((d) => d.preset === datePreset)?.label ?? "기간 선택";
-
   const isEmpty = !loading && !error && ages.length === 0 && genders.length === 0;
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap gap-y-2">
+      <div className="flex items-center gap-2 mb-4">
         <Users size={15} className="text-indigo-500" />
         <h3 className="text-sm font-semibold text-gray-700">광고 연령 및 성별</h3>
-
-        {/* Date picker */}
-        <div className="ml-auto relative">
-          <button
-            onClick={() => setShowDateMenu((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg transition-colors max-w-[200px] truncate"
-          >
-            <span className="truncate">{dateLabel}</span>
-            <ChevronDown size={12} className={`shrink-0 transition-transform ${showDateMenu ? "rotate-180" : ""}`} />
-          </button>
-          {showDateMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowDateMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[200px]">
-                {DATE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.preset}
-                    onClick={() => {
-                      setDatePreset(opt.preset);
-                      setAppliedSince("");
-                      setAppliedUntil("");
-                      setShowDateMenu(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                      datePreset === opt.preset
-                        ? "text-indigo-600 bg-indigo-50 font-medium"
-                        : "text-gray-600 hover:bg-gray-50"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-
-                {/* 날짜 지정 */}
-                <div className="border-t border-gray-100 mt-1 pt-2 px-3 pb-2">
-                  <p className="text-[10px] text-gray-400 mb-2 font-medium">날짜 직접 지정</p>
-                  <div className="flex flex-col gap-1.5">
-                    <input
-                      type="date"
-                      value={customSince}
-                      onChange={(e) => { setCustomSince(e.target.value); setDatePreset("custom"); }}
-                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                    />
-                    <input
-                      type="date"
-                      value={customUntil}
-                      onChange={(e) => { setCustomUntil(e.target.value); setDatePreset("custom"); }}
-                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                    />
-                    <button
-                      onClick={applyCustom}
-                      disabled={!customSince || !customUntil}
-                      className="flex items-center justify-center gap-1 w-full py-1.5 text-xs bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <Search size={11} />
-                      조회
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        <span className="ml-auto text-[10px] text-gray-400">상단 날짜 기준</span>
       </div>
 
       {/* Objective tabs */}
