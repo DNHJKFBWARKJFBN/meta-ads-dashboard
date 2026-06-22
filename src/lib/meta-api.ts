@@ -131,7 +131,7 @@ function dateParams(datePreset?: string | null, since?: string | null, until?: s
 
 export async function getAgeGenderInsights(objective?: string | null, datePreset?: string | null, since?: string | null, until?: string | null) {
   return call(`/${accountId()}/insights`, {
-    fields: "spend,impressions,reach,clicks",
+    fields: "spend,impressions,reach,clicks,inline_link_clicks,actions",
     breakdowns: "age,gender",
     limit: "200",
     ...dateParams(datePreset, since, until),

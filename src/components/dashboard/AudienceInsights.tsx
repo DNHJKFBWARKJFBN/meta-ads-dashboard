@@ -3,11 +3,19 @@
 import { useEffect, useState } from "react";
 import { Users, ChevronDown, Search } from "lucide-react";
 
+interface BreakdownAction {
+  action_type: string;
+  value: string;
+}
+
 interface BreakdownRow {
   age?: string;
   gender?: string;
   region?: string;
   spend: string;
+  impressions?: string;
+  inline_link_clicks?: string;
+  actions?: BreakdownAction[];
 }
 
 const AGE_ORDER = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"];
@@ -102,7 +110,17 @@ export default function AudienceInsights() {
   const region = data?.region ?? [];
 
   const ageMap: Record<string, number> = {};
-  ageGender.forEach((r) => { if (r.age) ageMap[r.age] = (ageMap[r.age] || 0) + parseFloat(r.spend || "0"); });
+  const ageClicks: Record<string, number> = {};
+  const ageImpressions: Record<string, number> = {};
+  const ageLpv: Record<string, number> = {};
+  ageGender.forEach((r) => {
+    if (!r.age) return;
+    ageMap[r.age] = (ageMap[r.age] || 0) + parseFloat(r.spend || "0");
+    ageClicks[r.age] = (ageClicks[r.age] || 0) + parseInt(r.inline_link_clicks || "0");
+    ageImpressions[r.age] = (ageImpressions[r.age] || 0) + parseInt(r.impressions || "0");
+    const lpvAction = r.actions?.find((a) => a.action_type === "landing_page_view");
+    ageLpv[r.age] = (ageLpv[r.age] || 0) + (lpvAction ? parseInt(lpvAction.value) : 0);
+  });
   const totalAge = Object.values(ageMap).reduce((s, v) => s + v, 0);
   const ages = AGE_ORDER.filter((a) => ageMap[a] > 0);
 
@@ -241,14 +259,22 @@ export default function AudienceInsights() {
               <div className="space-y-3">
                 {ages.map((age) => {
                   const pct = totalAge > 0 ? (ageMap[age] / totalAge) * 100 : 0;
+                  const ctr = ageImpressions[age] > 0 ? (ageClicks[age] / ageImpressions[age]) * 100 : 0;
+                  const lpvr = ageClicks[age] > 0 ? (ageLpv[age] / ageClicks[age]) * 100 : 0;
                   return (
-                    <div key={age} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-10 shrink-0">{age}</span>
-                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    <div key={age}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-gray-500 w-10 shrink-0">{age}</span>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 w-8 text-right">{pct.toFixed(0)}%</span>
+                        <span className="text-xs text-gray-400 w-24 text-right tabular-nums">{fmtKrw(ageMap[age])}</span>
                       </div>
-                      <span className="text-xs font-semibold text-gray-700 w-8 text-right">{pct.toFixed(0)}%</span>
-                      <span className="text-xs text-gray-400 w-24 text-right tabular-nums">{fmtKrw(ageMap[age])}</span>
+                      <div className="flex gap-3 pl-12 mb-1">
+                        <span className="text-[10px] text-gray-400">CTR <span className="text-indigo-500 font-medium">{ctr.toFixed(2)}%</span></span>
+                        <span className="text-[10px] text-gray-400">LPV율 <span className="text-emerald-500 font-medium">{lpvr > 0 ? `${lpvr.toFixed(1)}%` : "-"}</span></span>
+                      </div>
                     </div>
                   );
                 })}
