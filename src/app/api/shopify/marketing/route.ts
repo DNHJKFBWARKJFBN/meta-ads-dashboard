@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrders } from "@/lib/shopify-api";
+
+const SHOP = process.env.SHOPIFY_SHOP!;
+const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
+const API_VERSION = "2025-01";
 
 interface OrderWithAttribution {
   id: number;
@@ -11,6 +14,24 @@ interface OrderWithAttribution {
   landing_site: string | null;
   tags?: string;
   customer?: { orders_count: number };
+}
+
+async function fetchAllOrders(since?: string, until?: string): Promise<OrderWithAttribution[]> {
+  const results: OrderWithAttribution[] = [];
+  const fields = "id,created_at,financial_status,total_price,source_name,referring_site,landing_site,tags,customer";
+  const qs = new URLSearchParams({ limit: "250", status: "any", fields });
+  if (since) qs.set("created_at_min", `${since}T00:00:00`);
+  if (until) qs.set("created_at_max", `${until}T23:59:59`);
+  let nextUrl: string | null = `https://${SHOP}/admin/api/${API_VERSION}/orders.json?${qs}`;
+  while (nextUrl) {
+    const response: Response = await fetch(nextUrl, { headers: { "X-Shopify-Access-Token": TOKEN } });
+    if (!response.ok) throw new Error(`Shopify API error ${response.status}`);
+    const data = await response.json();
+    results.push(...(data.orders ?? []));
+    const linkHeader: string | null = response.headers.get("Link");
+    nextUrl = linkHeader?.match(/<([^>]+)>;\s*rel="next"/)?.[1] ?? null;
+  }
+  return results;
 }
 
 function detectChannel(order: OrderWithAttribution): string {
@@ -39,23 +60,8 @@ export async function GET(req: NextRequest) {
   const until = p.get("until") ?? undefined;
 
   try {
-    const rawOrders = await getOrders(since, until);
+    const orders = await fetchAllOrders(since, until);
 
-    // Re-fetch with attribution fields
-    const SHOP = process.env.SHOPIFY_SHOP!;
-    const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
-    const fields = "id,created_at,financial_status,total_price,source_name,referring_site,landing_site,tags,customer";
-    const params = new URLSearchParams({ limit: "250", status: "any", fields });
-    if (since) params.set("created_at_min", `${since}T00:00:00`);
-    if (until) params.set("created_at_max", `${until}T23:59:59`);
-
-    const res = await fetch(`https://${SHOP}/admin/api/2025-01/orders.json?${params}`, {
-      headers: { "X-Shopify-Access-Token": TOKEN },
-    });
-    const json = await res.json();
-    const orders: OrderWithAttribution[] = json.orders ?? [];
-
-    // Aggregate by channel
     const channelMap: Record<string, {
       orders: number;
       revenue: number;
@@ -64,7 +70,6 @@ export async function GET(req: NextRequest) {
       byDate: Record<string, { orders: number; revenue: number }>;
     }> = {};
 
-    // Free sample 제외 채널별 일별 주문수량
     const freeSampleExcluded: Record<string, Record<string, number>> = {};
 
     orders.forEach((order) => {
@@ -86,7 +91,6 @@ export async function GET(req: NextRequest) {
       channelMap[channel].byDate[date].orders += 1;
       channelMap[channel].byDate[date].revenue += rev;
 
-      // Free sample 태그 제외
       const tags = (order.tags ?? "").split(",").map((t: string) => t.trim());
       if (!tags.includes("Free sample")) {
         if (!freeSampleExcluded[date]) freeSampleExcluded[date] = {};
@@ -94,12 +98,11 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const totalOrders = rawOrders.length;
     const channels = Object.entries(channelMap)
       .map(([channel, data]) => ({ channel, ...data }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    return NextResponse.json({ channels, totalOrders, freeSampleExcluded });
+    return NextResponse.json({ channels, totalOrders: orders.length, freeSampleExcluded });
   } catch (e: unknown) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
