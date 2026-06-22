@@ -1,6 +1,6 @@
 import { DatePreset } from "@/types/meta";
 
-export const ACCOUNT_TIMEZONE = "Asia/Seoul";
+export const ACCOUNT_TIMEZONE = "America/Los_Angeles";
 
 export function pstDateString(date: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
