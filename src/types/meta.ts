@@ -66,6 +66,7 @@ export interface RowMetrics {
   ctr: number;
   impressions: number;
   reach: number;
+  frequency: number;
   cpc: number;
   cpm: number;
   conversions: number;
@@ -143,6 +144,7 @@ export function insightToMetrics(insight: MetaInsight): RowMetrics {
   const clicks = parseInt(insight.inline_link_clicks || "0");
   const impressions = parseInt(insight.impressions || "0");
   const reach = parseInt(insight.reach || "0");
+  const frequency = reach > 0 ? impressions / reach : 0;
   const conversions = getConversions(insight);
   const lpvAction = insight.actions?.find((a) => a.action_type === "landing_page_view");
   const lpv = lpvAction ? parseInt(lpvAction.value) : 0;
@@ -154,6 +156,7 @@ export function insightToMetrics(insight: MetaInsight): RowMetrics {
     ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
     impressions,
     reach,
+    frequency,
     cpc: clicks > 0 ? spend / clicks : 0,
     cpm: parseFloat(insight.cpm || "0"),
     conversions,
