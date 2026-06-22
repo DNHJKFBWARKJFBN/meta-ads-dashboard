@@ -14,7 +14,6 @@ export interface MetaInsight {
   cpm: string;
   spend: string;
   inline_link_clicks?: string;
-  landing_page_views?: string;
   purchase_roas?: MetaAction[];
   action_values?: MetaAction[];
   actions?: MetaAction[];
@@ -143,7 +142,8 @@ export function insightToMetrics(insight: MetaInsight): RowMetrics {
   const clicks = parseInt(insight.inline_link_clicks || "0");
   const impressions = parseInt(insight.impressions || "0");
   const conversions = getConversions(insight);
-  const lpv = parseInt(insight.landing_page_views || "0");
+  const lpvAction = insight.actions?.find((a) => a.action_type === "landing_page_view");
+  const lpv = lpvAction ? parseInt(lpvAction.value) : 0;
   return {
     spend,
     revenue,

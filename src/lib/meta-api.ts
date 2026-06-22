@@ -1,5 +1,5 @@
 const BASE = "https://graph.facebook.com/v21.0";
-const INSIGHT_BASE = "impressions,reach,clicks,ctr,cpc,cpm,spend,inline_link_clicks,landing_page_views,purchase_roas,action_values,actions";
+const INSIGHT_BASE = "impressions,reach,clicks,ctr,cpc,cpm,spend,inline_link_clicks,purchase_roas,action_values,actions";
 
 let _cachedToken: string | null = null;
 
