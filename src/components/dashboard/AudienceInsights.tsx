@@ -125,7 +125,17 @@ export default function AudienceInsights() {
   const ages = AGE_ORDER.filter((a) => ageMap[a] > 0);
 
   const genderMap: Record<string, number> = {};
-  ageGender.forEach((r) => { if (r.gender) genderMap[r.gender] = (genderMap[r.gender] || 0) + parseFloat(r.spend || "0"); });
+  const genderClicks: Record<string, number> = {};
+  const genderImpressions: Record<string, number> = {};
+  const genderLpv: Record<string, number> = {};
+  ageGender.forEach((r) => {
+    if (!r.gender) return;
+    genderMap[r.gender] = (genderMap[r.gender] || 0) + parseFloat(r.spend || "0");
+    genderClicks[r.gender] = (genderClicks[r.gender] || 0) + parseInt(r.inline_link_clicks || "0");
+    genderImpressions[r.gender] = (genderImpressions[r.gender] || 0) + parseInt(r.impressions || "0");
+    const lpvAction = r.actions?.find((a) => a.action_type === "landing_page_view");
+    genderLpv[r.gender] = (genderLpv[r.gender] || 0) + (lpvAction ? parseInt(lpvAction.value) : 0);
+  });
   const totalGender = Object.values(genderMap).reduce((s, v) => s + v, 0);
   const genders = ["female", "male", "unknown"].filter((g) => genderMap[g] > 0);
 
@@ -287,14 +297,22 @@ export default function AudienceInsights() {
               <div className="space-y-3 mb-4">
                 {genders.map((g) => {
                   const pct = totalGender > 0 ? (genderMap[g] / totalGender) * 100 : 0;
+                  const ctr = genderImpressions[g] > 0 ? (genderClicks[g] / genderImpressions[g]) * 100 : 0;
+                  const lpvr = genderClicks[g] > 0 ? (genderLpv[g] / genderClicks[g]) * 100 : 0;
                   return (
-                    <div key={g} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-12 shrink-0">{GENDER_LABELS[g]}</span>
-                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${GENDER_BAR[g]}`} style={{ width: `${pct}%` }} />
+                    <div key={g}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-gray-500 w-12 shrink-0">{GENDER_LABELS[g]}</span>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${GENDER_BAR[g]}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 w-8 text-right">{pct.toFixed(0)}%</span>
+                        <span className="text-xs text-gray-400 w-24 text-right tabular-nums">{fmtKrw(genderMap[g])}</span>
                       </div>
-                      <span className="text-xs font-semibold text-gray-700 w-8 text-right">{pct.toFixed(0)}%</span>
-                      <span className="text-xs text-gray-400 w-24 text-right tabular-nums">{fmtKrw(genderMap[g])}</span>
+                      <div className="flex gap-3 pl-14 mb-1">
+                        <span className="text-[10px] text-gray-400">CTR <span className="text-indigo-500 font-medium">{ctr.toFixed(2)}%</span></span>
+                        <span className="text-[10px] text-gray-400">LPV율 <span className="text-emerald-500 font-medium">{lpvr > 0 ? `${lpvr.toFixed(1)}%` : "-"}</span></span>
+                      </div>
                     </div>
                   );
                 })}
