@@ -7,7 +7,7 @@ import { MetaCampaign, MetaAdSet, MetaAd, insightToMetrics, getBudgetAmount, isD
 import { useDashboard } from "@/lib/context";
 
 type Level = "campaign" | "adset" | "ad";
-type SortKey = "spend" | "revenue" | "roas" | "clicks" | "ctr" | "impressions";
+type SortKey = "spend" | "revenue" | "roas" | "clicks" | "ctr" | "impressions" | "lpv" | "lpvr";
 
 function roasBadge(roas: number) {
   if (roas >= 3) return "text-emerald-600 font-semibold";
@@ -93,8 +93,8 @@ export default function DrilldownTable({ activeOnly = false }: { activeOnly?: bo
   const sorted = [...rows].sort((a, b) => {
     const ai = a.insights?.data?.[0];
     const bi = b.insights?.data?.[0];
-    const am = ai ? insightToMetrics(ai) : { spend: 0, revenue: 0, roas: 0, clicks: 0, ctr: 0, impressions: 0, cpc: 0 };
-    const bm = bi ? insightToMetrics(bi) : { spend: 0, revenue: 0, roas: 0, clicks: 0, ctr: 0, impressions: 0, cpc: 0 };
+    const am = ai ? insightToMetrics(ai) : { spend: 0, revenue: 0, roas: 0, clicks: 0, ctr: 0, impressions: 0, cpc: 0, lpv: 0, lpvr: 0 };
+    const bm = bi ? insightToMetrics(bi) : { spend: 0, revenue: 0, roas: 0, clicks: 0, ctr: 0, impressions: 0, cpc: 0, lpv: 0, lpvr: 0 };
     const diff = am[sortKey] - bm[sortKey];
     return sortAsc ? diff : -diff;
   });
@@ -104,12 +104,12 @@ export default function DrilldownTable({ activeOnly = false }: { activeOnly?: bo
     const ins = row.insights?.data?.[0];
     if (!ins) return { ...acc, budget };
     const m = insightToMetrics(ins);
-    return { spend: acc.spend + m.spend, revenue: acc.revenue + m.revenue, clicks: acc.clicks + m.clicks, impressions: acc.impressions + m.impressions, budget };
-  }, { spend: 0, revenue: 0, clicks: 0, impressions: 0, budget: 0 });
+    return { spend: acc.spend + m.spend, revenue: acc.revenue + m.revenue, clicks: acc.clicks + m.clicks, impressions: acc.impressions + m.impressions, lpv: acc.lpv + m.lpv, budget };
+  }, { spend: 0, revenue: 0, clicks: 0, impressions: 0, lpv: 0, budget: 0 });
 
   const levelLabel: Record<Level, string> = { campaign: "캠페인", adset: "광고세트", ad: "광고" };
   const showBudget = level !== "ad";
-  const colCount = 8 + (showBudget ? 1 : 0) + (level !== "campaign" ? 1 : 0);
+  const colCount = 10 + (showBudget ? 1 : 0) + (level !== "campaign" ? 1 : 0);
 
   function Th({ col, label }: { col: SortKey; label: string }) {
     return (
@@ -155,6 +155,8 @@ export default function DrilldownTable({ activeOnly = false }: { activeOnly?: bo
               <Th col="clicks" label="클릭" />
               <Th col="ctr" label="CTR" />
               <Th col="impressions" label="노출" />
+              <Th col="lpv" label="LPV" />
+              <Th col="lpvr" label="LPV율" />
               {level !== "campaign" && <th className="px-5 py-3 text-xs font-medium text-gray-500"></th>}
             </tr>
           </thead>
@@ -205,6 +207,8 @@ export default function DrilldownTable({ activeOnly = false }: { activeOnly?: bo
                   <td className="px-4 py-3 text-right text-gray-600">{m ? m.clicks.toLocaleString() : "-"}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{m ? `${m.ctr.toFixed(2)}%` : "-"}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{m ? m.impressions.toLocaleString() : "-"}</td>
+                  <td className="px-4 py-3 text-right text-gray-600">{m ? (m.lpv > 0 ? m.lpv.toLocaleString() : "-") : "-"}</td>
+                  <td className="px-4 py-3 text-right text-gray-600">{m ? (m.lpvr > 0 ? `${m.lpvr.toFixed(1)}%` : "-") : "-"}</td>
                   {isAd && (
                     <td className="px-5 py-3 text-right">
                       {ad.creative?.instagram_permalink_url && (
@@ -234,6 +238,8 @@ export default function DrilldownTable({ activeOnly = false }: { activeOnly?: bo
                 <td className="px-4 py-3 text-right text-gray-800">{totals.clicks.toLocaleString()}</td>
                 <td></td>
                 <td className="px-4 py-3 text-right text-gray-800">{totals.impressions.toLocaleString()}</td>
+                <td className="px-4 py-3 text-right text-gray-800">{totals.lpv > 0 ? totals.lpv.toLocaleString() : "-"}</td>
+                <td className="px-4 py-3 text-right text-gray-800">{totals.clicks > 0 && totals.lpv > 0 ? `${((totals.lpv / totals.clicks) * 100).toFixed(1)}%` : "-"}</td>
                 {level === "ad" && <td></td>}
               </tr>
             </tfoot>

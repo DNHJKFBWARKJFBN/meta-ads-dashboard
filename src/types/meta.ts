@@ -14,6 +14,7 @@ export interface MetaInsight {
   cpm: string;
   spend: string;
   inline_link_clicks?: string;
+  landing_page_views?: string;
   purchase_roas?: MetaAction[];
   action_values?: MetaAction[];
   actions?: MetaAction[];
@@ -69,6 +70,8 @@ export interface RowMetrics {
   cpm: number;
   conversions: number;
   cvr: number;
+  lpv: number;
+  lpvr: number;
 }
 
 export function getBudgetAmount(item: { daily_budget?: string; lifetime_budget?: string }): number {
@@ -140,6 +143,7 @@ export function insightToMetrics(insight: MetaInsight): RowMetrics {
   const clicks = parseInt(insight.inline_link_clicks || "0");
   const impressions = parseInt(insight.impressions || "0");
   const conversions = getConversions(insight);
+  const lpv = parseInt(insight.landing_page_views || "0");
   return {
     spend,
     revenue,
@@ -151,5 +155,7 @@ export function insightToMetrics(insight: MetaInsight): RowMetrics {
     cpm: parseFloat(insight.cpm || "0"),
     conversions,
     cvr: clicks > 0 ? (conversions / clicks) * 100 : 0,
+    lpv,
+    lpvr: clicks > 0 ? (lpv / clicks) * 100 : 0,
   };
 }
