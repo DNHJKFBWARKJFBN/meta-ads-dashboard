@@ -9,6 +9,7 @@ interface OrderWithAttribution {
   source_name: string | null;
   referring_site: string | null;
   landing_site: string | null;
+  tags?: string;
   customer?: { orders_count: number };
 }
 
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     // Re-fetch with attribution fields
     const SHOP = process.env.SHOPIFY_SHOP!;
     const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
-    const fields = "id,created_at,financial_status,total_price,source_name,referring_site,landing_site,customer";
+    const fields = "id,created_at,financial_status,total_price,source_name,referring_site,landing_site,tags,customer";
     const params = new URLSearchParams({ limit: "250", status: "any", fields });
     if (since) params.set("created_at_min", `${since}T00:00:00`);
     if (until) params.set("created_at_max", `${until}T23:59:59`);
@@ -63,6 +64,9 @@ export async function GET(req: NextRequest) {
       byDate: Record<string, { orders: number; revenue: number }>;
     }> = {};
 
+    // Free sample 제외 채널별 일별 주문수량
+    const freeSampleExcluded: Record<string, Record<string, number>> = {};
+
     orders.forEach((order) => {
       if (order.financial_status === "voided") return;
       const channel = detectChannel(order);
@@ -81,6 +85,13 @@ export async function GET(req: NextRequest) {
       if (!channelMap[channel].byDate[date]) channelMap[channel].byDate[date] = { orders: 0, revenue: 0 };
       channelMap[channel].byDate[date].orders += 1;
       channelMap[channel].byDate[date].revenue += rev;
+
+      // Free sample 태그 제외
+      const tags = (order.tags ?? "").split(",").map((t: string) => t.trim());
+      if (!tags.includes("Free sample")) {
+        if (!freeSampleExcluded[date]) freeSampleExcluded[date] = {};
+        freeSampleExcluded[date][channel] = (freeSampleExcluded[date][channel] || 0) + 1;
+      }
     });
 
     const totalOrders = rawOrders.length;
@@ -88,7 +99,7 @@ export async function GET(req: NextRequest) {
       .map(([channel, data]) => ({ channel, ...data }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    return NextResponse.json({ channels, totalOrders });
+    return NextResponse.json({ channels, totalOrders, freeSampleExcluded });
   } catch (e: unknown) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

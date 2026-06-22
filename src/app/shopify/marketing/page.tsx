@@ -14,6 +14,11 @@ interface ChannelData {
   byDate: Record<string, { orders: number; revenue: number }>;
 }
 
+interface SessionData {
+  date: string;
+  count: number;
+}
+
 const CHANNEL_COLORS: Record<string, string> = {
   TikTok: "#010101",
   Facebook: "#1877f2",
@@ -36,6 +41,9 @@ const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 export default function ShopifyMarketingPage() {
   const { datePreset, customRange, setSidebarOpen } = useDashboard();
   const [channels, setChannels] = useState<ChannelData[]>([]);
+  const [freeSampleExcluded, setFreeSampleExcluded] = useState<Record<string, Record<string, number>>>({});
+  const [sessions, setSessions] = useState<SessionData[]>([]);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -47,9 +55,20 @@ export default function ShopifyMarketingPage() {
     setError(null);
     const qs = new URLSearchParams();
     if (resolved) { qs.set("since", resolved.since); qs.set("until", resolved.until); }
-    fetch(`/api/shopify/marketing?${qs}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.error) throw new Error(d.error); setChannels(d.channels ?? []); })
+
+    Promise.all([
+      fetch(`/api/shopify/marketing?${qs}`).then((r) => r.json()),
+      resolved
+        ? fetch(`/api/shopify/sessions?since=${resolved.since}&until=${resolved.until}`).then((r) => r.json())
+        : Promise.resolve({ sessions: [] }),
+    ])
+      .then(([mkt, ses]) => {
+        if (mkt.error) throw new Error(mkt.error);
+        setChannels(mkt.channels ?? []);
+        setFreeSampleExcluded(mkt.freeSampleExcluded ?? {});
+        if (ses.error) setSessionsError(ses.error);
+        else setSessions(ses.sessions ?? []);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [resolved?.since, resolved?.until, refreshKey]);
@@ -248,6 +267,113 @@ export default function ShopifyMarketingPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Free sample 제외 채널별 일별 판매수량 */}
+        {!loading && Object.keys(freeSampleExcluded).length > 0 && (() => {
+          const dates = Object.keys(freeSampleExcluded).sort().slice(-60);
+          const allChannels = [...new Set(dates.flatMap((d) => Object.keys(freeSampleExcluded[d] || {})))];
+          const maxVal = Math.max(...dates.map((d) => Object.values(freeSampleExcluded[d] || {}).reduce((s, v) => s + v, 0)), 1);
+          return (
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-3 mb-4 flex-wrap">
+                <p className="text-xs font-semibold text-gray-500">채널별 일별 판매수량 <span className="text-gray-400 font-normal">(Free sample 제외)</span></p>
+                <div className="flex flex-wrap gap-3">
+                  {allChannels.slice(0, 5).map((ch) => (
+                    <span key={ch} className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <span className="w-2 h-2 rounded-full" style={{ background: getColor(ch) }} />
+                      {ch}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <div className="flex gap-px items-end" style={{ minHeight: 80 }}>
+                  {dates.map((date) => {
+                    const dayTotal = Object.values(freeSampleExcluded[date] || {}).reduce((s, v) => s + v, 0);
+                    const h = Math.round((dayTotal / maxVal) * 70);
+                    return (
+                      <div key={date} className="flex flex-col-reverse gap-px flex-1 min-w-[6px]" title={`${date}: ${dayTotal}건`}>
+                        {allChannels.slice(0, 5).map((ch) => {
+                          const val = freeSampleExcluded[date]?.[ch] || 0;
+                          const chH = Math.round((val / maxVal) * 70);
+                          return chH > 0 ? (
+                            <div key={ch} className="w-full rounded-sm" style={{ height: chH, background: getColor(ch) }} />
+                          ) : null;
+                        })}
+                        {h === 0 && <div className="w-full rounded-sm bg-gray-100" style={{ height: 4 }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-[10px] text-gray-400">{dates[0]}</span>
+                  <span className="text-[10px] text-gray-400">{dates[dates.length - 1]}</span>
+                </div>
+              </div>
+              {/* 채널별 합계 */}
+              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
+                {allChannels.map((ch) => {
+                  const total = dates.reduce((s, d) => s + (freeSampleExcluded[d]?.[ch] || 0), 0);
+                  return (
+                    <div key={ch} className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getColor(ch) }} />
+                      <span className="text-xs text-gray-600">{ch}</span>
+                      <span className="text-xs font-semibold text-gray-800">{total}건</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 온라인스토어 일별 세션수 */}
+        {!loading && (
+          <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+            <p className="text-xs font-semibold text-gray-500 mb-4">온라인스토어 일별 세션수</p>
+            {sessionsError ? (
+              <p className="text-xs text-red-400 py-2">{sessionsError}</p>
+            ) : sessions.length === 0 ? (
+              <p className="text-xs text-gray-400 py-4 text-center">세션 데이터가 없습니다.</p>
+            ) : (() => {
+              const maxSessions = Math.max(...sessions.map((s) => s.count), 1);
+              return (
+                <>
+                  <div className="overflow-x-auto">
+                    <div className="flex gap-px items-end" style={{ minHeight: 80 }}>
+                      {sessions.slice(-60).map((s) => {
+                        const h = Math.max(Math.round((s.count / maxSessions) * 70), 2);
+                        return (
+                          <div key={s.date} className="flex-1 min-w-[6px] flex flex-col items-center gap-0.5" title={`${s.date}: ${s.count.toLocaleString()}세션`}>
+                            <div className="w-full rounded-t-sm bg-cyan-400" style={{ height: h }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-[10px] text-gray-400">{sessions[0]?.date}</span>
+                      <span className="text-[10px] text-gray-400">{sessions[sessions.length - 1]?.date}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-6">
+                    <div>
+                      <p className="text-[10px] text-gray-400">총 세션</p>
+                      <p className="text-sm font-bold text-gray-800">{sessions.reduce((s, d) => s + d.count, 0).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400">일평균</p>
+                      <p className="text-sm font-bold text-gray-800">{Math.round(sessions.reduce((s, d) => s + d.count, 0) / sessions.length).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400">최고</p>
+                      <p className="text-sm font-bold text-cyan-600">{maxSessions.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
