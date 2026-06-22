@@ -246,6 +246,7 @@ export default function DrilldownTable({ activeOnly = false }: { activeOnly?: bo
                 <td className="px-4 py-3 text-right text-gray-800">{totals.clicks.toLocaleString()}</td>
                 <td></td>
                 <td className="px-4 py-3 text-right text-gray-800">{totals.clicks > 0 ? `$${(totals.spend / totals.clicks).toFixed(2)}` : "-"}</td>
+                <td className="px-4 py-3 text-right text-gray-800">{totals.impressions > 0 ? `$${((totals.spend / totals.impressions) * 1000).toFixed(2)}` : "-"}</td>
                 <td className="px-4 py-3 text-right text-gray-800">{totals.impressions.toLocaleString()}</td>
                 <td className="px-4 py-3 text-right text-gray-800">{totals.reach > 0 ? totals.reach.toLocaleString() : "-"}</td>
                 <td className="px-4 py-3 text-right text-gray-800">{totals.reach > 0 && totals.impressions > 0 ? (totals.impressions / totals.reach).toFixed(2) : "-"}</td>
