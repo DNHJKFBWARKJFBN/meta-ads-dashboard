@@ -270,60 +270,71 @@ export default function ShopifyMarketingPage() {
           </div>
         )}
 
-        {/* Free sample 제외 채널별 일별 판매수량 */}
+        {/* Free sample 제외 채널별 일별 판매수량 — 표 형식 */}
         {!loading && Object.keys(freeSampleExcluded).length > 0 && (() => {
-          const dates = Object.keys(freeSampleExcluded).sort().slice(-60);
+          const dates = Object.keys(freeSampleExcluded).sort();
           const allChannels = [...new Set(dates.flatMap((d) => Object.keys(freeSampleExcluded[d] || {})))];
-          const maxVal = Math.max(...dates.map((d) => Object.values(freeSampleExcluded[d] || {}).reduce((s, v) => s + v, 0)), 1);
           return (
             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-3 mb-4 flex-wrap">
-                <p className="text-xs font-semibold text-gray-500">채널별 일별 판매수량 <span className="text-gray-400 font-normal">(Free sample 제외)</span></p>
-                <div className="flex flex-wrap gap-3">
-                  {allChannels.slice(0, 5).map((ch) => (
-                    <span key={ch} className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <span className="w-2 h-2 rounded-full" style={{ background: getColor(ch) }} />
-                      {ch}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <p className="text-xs font-semibold text-gray-500 mb-4">
+                채널별 일별 판매수량 <span className="text-gray-400 font-normal">(Free sample 제외)</span>
+              </p>
               <div className="overflow-x-auto">
-                <div className="flex gap-px items-end" style={{ minHeight: 80 }}>
-                  {dates.map((date) => {
-                    const dayTotal = Object.values(freeSampleExcluded[date] || {}).reduce((s, v) => s + v, 0);
-                    const h = Math.round((dayTotal / maxVal) * 70);
-                    return (
-                      <div key={date} className="flex flex-col-reverse gap-px flex-1 min-w-[6px]" title={`${date}: ${dayTotal}건`}>
-                        {allChannels.slice(0, 5).map((ch) => {
-                          const val = freeSampleExcluded[date]?.[ch] || 0;
-                          const chH = Math.round((val / maxVal) * 70);
-                          return chH > 0 ? (
-                            <div key={ch} className="w-full rounded-sm" style={{ height: chH, background: getColor(ch) }} />
-                          ) : null;
-                        })}
-                        {h === 0 && <div className="w-full rounded-sm bg-gray-100" style={{ height: 4 }} />}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex justify-between mt-1">
-                  <span className="text-[10px] text-gray-400">{dates[0]}</span>
-                  <span className="text-[10px] text-gray-400">{dates[dates.length - 1]}</span>
-                </div>
-              </div>
-              {/* 채널별 합계 */}
-              <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-4">
-                {allChannels.map((ch) => {
-                  const total = dates.reduce((s, d) => s + (freeSampleExcluded[d]?.[ch] || 0), 0);
-                  return (
-                    <div key={ch} className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getColor(ch) }} />
-                      <span className="text-xs text-gray-600">{ch}</span>
-                      <span className="text-xs font-semibold text-gray-800">{total}건</span>
-                    </div>
-                  );
-                })}
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left py-2 pr-4 text-gray-400 font-medium whitespace-nowrap">날짜</th>
+                      {allChannels.map((ch) => (
+                        <th key={ch} className="text-center py-2 px-3 font-medium whitespace-nowrap">
+                          <span className="flex items-center justify-center gap-1">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getColor(ch) }} />
+                            {ch}
+                          </span>
+                        </th>
+                      ))}
+                      <th className="text-center py-2 px-3 text-gray-500 font-medium whitespace-nowrap">합계</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dates.map((date, i) => {
+                      const rowTotal = allChannels.reduce((s, ch) => s + (freeSampleExcluded[date]?.[ch] || 0), 0);
+                      return (
+                        <tr key={date} className={i % 2 === 0 ? "bg-gray-50/50" : ""}>
+                          <td className="py-2 pr-4 text-gray-500 whitespace-nowrap tabular-nums">{date}</td>
+                          {allChannels.map((ch) => {
+                            const val = freeSampleExcluded[date]?.[ch] || 0;
+                            return (
+                              <td key={ch} className="text-center py-2 px-3 tabular-nums">
+                                {val > 0 ? (
+                                  <span className="font-semibold text-gray-800">{val}</span>
+                                ) : (
+                                  <span className="text-gray-200">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="text-center py-2 px-3 font-bold text-gray-700 tabular-nums">{rowTotal > 0 ? rowTotal : <span className="text-gray-200">—</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-gray-200">
+                      <td className="py-2 pr-4 text-gray-500 font-semibold">합계</td>
+                      {allChannels.map((ch) => {
+                        const total = dates.reduce((s, d) => s + (freeSampleExcluded[d]?.[ch] || 0), 0);
+                        return (
+                          <td key={ch} className="text-center py-2 px-3 font-bold text-gray-800 tabular-nums">
+                            {total}
+                          </td>
+                        );
+                      })}
+                      <td className="text-center py-2 px-3 font-bold text-indigo-600 tabular-nums">
+                        {dates.reduce((s, d) => s + allChannels.reduce((cs, ch) => cs + (freeSampleExcluded[d]?.[ch] || 0), 0), 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           );

@@ -7,6 +7,7 @@ const API_VERSION = "2025-01";
 interface OrderWithAttribution {
   id: number;
   created_at: string;
+  cancelled_at: string | null;
   financial_status: string;
   total_price: string;
   source_name: string | null;
@@ -18,7 +19,7 @@ interface OrderWithAttribution {
 
 async function fetchAllOrders(since?: string, until?: string): Promise<OrderWithAttribution[]> {
   const results: OrderWithAttribution[] = [];
-  const fields = "id,created_at,financial_status,total_price,source_name,referring_site,landing_site,tags,customer";
+  const fields = "id,created_at,cancelled_at,financial_status,total_price,source_name,referring_site,landing_site,tags,customer";
   const qs = new URLSearchParams({ limit: "250", status: "any", fields });
   if (since) qs.set("created_at_min", `${since}T00:00:00`);
   if (until) qs.set("created_at_max", `${until}T23:59:59`);
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
     const freeSampleExcluded: Record<string, Record<string, number>> = {};
 
     orders.forEach((order) => {
-      if (order.financial_status === "voided") return;
+      if (order.financial_status === "voided" || order.cancelled_at) return;
       const channel = detectChannel(order);
       if (!channelMap[channel]) {
         channelMap[channel] = { orders: 0, revenue: 0, newCustomers: 0, returningCustomers: 0, byDate: {} };
