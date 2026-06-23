@@ -334,7 +334,7 @@ export default function ShopifyMarketingPage() {
           <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
             <p className="text-xs font-semibold text-gray-500 mb-4">온라인스토어 일별 세션수</p>
             {sessionsError ? (
-              <p className="text-xs text-gray-400 py-2">세션 데이터는 Shopify Plus 플랜에서 지원됩니다.</p>
+              <p className="text-xs text-red-400 py-2">{sessionsError}</p>
             ) : sessions.length === 0 ? (
               <p className="text-xs text-gray-400 py-4 text-center">세션 데이터가 없습니다.</p>
             ) : (() => {
