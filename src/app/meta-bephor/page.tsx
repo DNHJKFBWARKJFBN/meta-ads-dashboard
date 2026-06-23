@@ -8,6 +8,7 @@ import RoasChart from "@/components/charts/RoasChart";
 import DrilldownTable from "@/components/dashboard/DrilldownTable";
 import TopCreatives from "@/components/dashboard/TopCreatives";
 import BudgetPacing from "@/components/dashboard/BudgetPacing";
+import MonthlyBudget from "@/components/dashboard/MonthlyBudget";
 import AudienceInsights from "@/components/dashboard/AudienceInsights";
 import ObjectiveKpis from "@/components/dashboard/ObjectiveKpis";
 import Memo from "@/components/dashboard/Memo";
@@ -140,6 +141,9 @@ export default function MetaBephorPage() {
 
         {/* Live Budget */}
         <LiveBudget />
+
+        {/* Monthly Budget */}
+        <MonthlyBudget />
 
         {/* Budget Pacing */}
         {!loading && summary && resolvedRange && (
