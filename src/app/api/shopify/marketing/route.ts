@@ -4,17 +4,6 @@ const SHOP = process.env.SHOPIFY_SHOP!;
 const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
 const API_VERSION = "2025-01";
 
-function laOffset(): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    timeZoneName: "shortOffset",
-  }).formatToParts(new Date());
-  const tz = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT-7";
-  const m = tz.match(/GMT([+-])(\d+)/);
-  if (!m) return "-07:00";
-  return `${m[1]}${m[2].padStart(2, "0")}:00`;
-}
-
 interface OrderWithAttribution {
   id: number;
   created_at: string;
@@ -31,9 +20,8 @@ async function fetchAllOrders(since?: string, until?: string): Promise<OrderWith
   const results: OrderWithAttribution[] = [];
   const fields = "id,created_at,financial_status,total_price,source_name,referring_site,landing_site,tags,customer";
   const qs = new URLSearchParams({ limit: "250", status: "any", fields });
-  const tz = laOffset();
-  if (since) qs.set("created_at_min", `${since}T00:00:00${tz}`);
-  if (until) qs.set("created_at_max", `${until}T23:59:59${tz}`);
+  if (since) qs.set("created_at_min", `${since}T00:00:00`);
+  if (until) qs.set("created_at_max", `${until}T23:59:59`);
   let nextUrl: string | null = `https://${SHOP}/admin/api/${API_VERSION}/orders.json?${qs}`;
   while (nextUrl) {
     const response: Response = await fetch(nextUrl, { headers: { "X-Shopify-Access-Token": TOKEN } });

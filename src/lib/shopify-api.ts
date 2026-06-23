@@ -3,17 +3,6 @@ const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
 const API_VERSION = "2025-01";
 const BASE = `https://${SHOP}/admin/api/${API_VERSION}`;
 
-function laOffset(): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    timeZoneName: "shortOffset",
-  }).formatToParts(new Date());
-  const tz = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT-7";
-  const m = tz.match(/GMT([+-])(\d+)/);
-  if (!m) return "-07:00";
-  return `${m[1]}${m[2].padStart(2, "0")}:00`;
-}
-
 function headers() {
   return { "X-Shopify-Access-Token": TOKEN, "Content-Type": "application/json" };
 }
@@ -72,10 +61,9 @@ async function fetchAll<T>(path: string, key: string, params: Record<string, str
 }
 
 export async function getOrders(since?: string, until?: string): Promise<ShopifyOrder[]> {
-  const tz = laOffset();
   const params: Record<string, string> = { status: "any" };
-  if (since) params.created_at_min = `${since}T00:00:00${tz}`;
-  if (until) params.created_at_max = `${until}T23:59:59${tz}`;
+  if (since) params.created_at_min = `${since}T00:00:00`;
+  if (until) params.created_at_max = `${until}T23:59:59`;
   return fetchAll<ShopifyOrder>("orders.json", "orders", params);
 }
 
@@ -84,9 +72,8 @@ export async function getProducts(): Promise<ShopifyProduct[]> {
 }
 
 export async function getCustomers(since?: string, until?: string): Promise<ShopifyCustomer[]> {
-  const tz = laOffset();
   const params: Record<string, string> = {};
-  if (since) params.created_at_min = `${since}T00:00:00${tz}`;
-  if (until) params.created_at_max = `${until}T23:59:59${tz}`;
+  if (since) params.created_at_min = `${since}T00:00:00`;
+  if (until) params.created_at_max = `${until}T23:59:59`;
   return fetchAll<ShopifyCustomer>("customers.json", "customers", params);
 }
