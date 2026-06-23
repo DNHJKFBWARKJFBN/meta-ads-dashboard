@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { shopifyGraphQL } from "@/lib/shopify-graphql";
 
-interface ShopifyQLColumn { name: string; dataType: string; displayName: string; }
-interface ShopifyQLResult {
-  shopifyqlQuery: {
-    __typename: string;
-    tableData?: { rowData: string[][]; columns: ShopifyQLColumn[] };
-    parseErrors?: { code: string; message: string }[];
-  };
-}
+const SHOP = process.env.SHOPIFY_SHOP!;
+const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
+const API_VERSION = "2025-01";
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
@@ -17,59 +11,62 @@ export async function GET(req: NextRequest) {
 
   if (!since || !until) return NextResponse.json({ error: "since, until required" }, { status: 400 });
 
-  // Use inline string instead of GraphQL variables — ShopifyQL requires this
-  const gql = `{
-    shopifyqlQuery(query: "FROM sessions SINCE ${since} UNTIL ${until} GROUP BY day") {
-      __typename
-      ... on TableResponse {
-        tableData {
-          rowData
-          columns { name dataType displayName }
+  // Try 1: ShopifyQL via REST analytics endpoint
+  try {
+    const analyticsRes = await fetch(
+      `https://${SHOP}/admin/api/${API_VERSION}/analytics.json?` +
+        new URLSearchParams({ report_type: "sessions", since, until }),
+      { headers: { "X-Shopify-Access-Token": TOKEN } }
+    );
+    if (analyticsRes.ok) {
+      const data = await analyticsRes.json();
+      return NextResponse.json({ sessions: data.sessions ?? data, source: "analytics_rest" });
+    }
+  } catch {
+    // continue
+  }
+
+  // Try 2: Reports endpoint — list reports and find sessions
+  try {
+    const reportsRes = await fetch(
+      `https://${SHOP}/admin/api/${API_VERSION}/reports.json?fields=id,name,category&since_id=0&limit=250`,
+      { headers: { "X-Shopify-Access-Token": TOKEN } }
+    );
+    if (reportsRes.ok) {
+      const data = await reportsRes.json();
+      const reports: { id: number; name: string; category: string }[] = data.reports ?? [];
+      const sessionReport = reports.find(
+        (r) =>
+          r.name.toLowerCase().includes("session") ||
+          r.name.toLowerCase().includes("visit") ||
+          r.category?.toLowerCase().includes("traffic")
+      );
+      if (sessionReport) {
+        // Found a session report — try fetching it
+        const repRes = await fetch(
+          `https://${SHOP}/admin/api/${API_VERSION}/reports/${sessionReport.id}/report.json?` +
+            new URLSearchParams({ since, until }),
+          { headers: { "X-Shopify-Access-Token": TOKEN } }
+        );
+        if (repRes.ok) {
+          const repData = await repRes.json();
+          return NextResponse.json({ sessions: repData, source: `report:${sessionReport.name}` });
         }
       }
-      ... on ParseError {
-        parseErrors { code message }
-      }
-    }
-  }`;
-
-  try {
-    const data = await shopifyGraphQL<ShopifyQLResult>(gql);
-    const result = data.shopifyqlQuery;
-
-    if (result.__typename === "ParseError") {
+      // Return available report names for debugging
       return NextResponse.json({
-        error: result.parseErrors?.map((e) => e.message).join(", "),
-      }, { status: 400 });
-    }
-
-    const tableData = result.tableData;
-    if (!tableData) return NextResponse.json({ sessions: [] });
-
-    const dayIdx = tableData.columns.findIndex((c) => c.name === "day");
-    const sessionsIdx = tableData.columns.findIndex((c) =>
-      c.name === "sessions_count" || c.name === "sessions" || c.name.includes("session")
-    );
-
-    if (dayIdx === -1 || sessionsIdx === -1) {
-      return NextResponse.json({ sessions: [], columns: tableData.columns.map((c) => c.name) });
-    }
-
-    const sessions = tableData.rowData.map((row) => ({
-      date: row[dayIdx],
-      count: parseInt(row[sessionsIdx] || "0"),
-    }));
-
-    return NextResponse.json({ sessions });
-  } catch (e: unknown) {
-    const msg = (e as Error).message;
-    // If shopifyqlQuery field doesn't exist, return plan limitation error
-    if (msg.includes("shopifyqlQuery") || msg.includes("doesn't exist")) {
-      return NextResponse.json({
-        error: "세션 데이터는 Shopify Plus 플랜에서 지원됩니다 (ShopifyQL 필요)",
-        unavailable: true,
+        sessions: [],
+        debug_reports: reports.slice(0, 20).map((r) => `[${r.category}] ${r.name}`),
+        error: "세션 관련 report를 찾지 못했습니다.",
       });
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+  } catch {
+    // continue
   }
+
+  return NextResponse.json({
+    sessions: [],
+    error: "Shopify 세션 API에 접근할 수 없습니다. (read_analytics 권한 확인 필요)",
+    unavailable: true,
+  });
 }
