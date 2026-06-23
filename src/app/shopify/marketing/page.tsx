@@ -285,7 +285,7 @@ export default function ShopifyMarketingPage() {
                     <tr className="border-b border-gray-100">
                       <th className="text-left py-2 pr-4 text-gray-400 font-medium whitespace-nowrap">날짜</th>
                       {allChannels.map((ch) => (
-                        <th key={ch} className="text-center py-2 px-3 font-medium whitespace-nowrap">
+                        <th key={ch} className="text-center py-2 px-3 font-medium whitespace-nowrap text-gray-800">
                           <span className="flex items-center justify-center gap-1">
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getColor(ch) }} />
                             {ch}
