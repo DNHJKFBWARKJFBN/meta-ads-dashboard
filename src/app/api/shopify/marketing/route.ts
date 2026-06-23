@@ -13,13 +13,12 @@ interface OrderWithAttribution {
   source_name: string | null;
   referring_site: string | null;
   landing_site: string | null;
-  tags?: string;
   customer?: { orders_count: number };
 }
 
 async function fetchAllOrders(since?: string, until?: string): Promise<OrderWithAttribution[]> {
   const results: OrderWithAttribution[] = [];
-  const fields = "id,created_at,cancelled_at,financial_status,total_price,source_name,referring_site,landing_site,tags,customer";
+  const fields = "id,created_at,cancelled_at,financial_status,total_price,source_name,referring_site,landing_site,customer";
   const qs = new URLSearchParams({ limit: "250", status: "any", fields });
   if (since) qs.set("created_at_min", `${since}T00:00:00`);
   if (until) qs.set("created_at_max", `${until}T23:59:59`);
@@ -124,8 +123,7 @@ export async function GET(req: NextRequest) {
       channelMap[channel].byDate[date].orders += 1;
       channelMap[channel].byDate[date].revenue += rev;
 
-      const tags = (order.tags ?? "").split(",").map((t: string) => t.trim());
-      if (!tags.includes("Free sample")) {
+      if (rev > 0) {
         if (!freeSampleExcluded[date]) freeSampleExcluded[date] = {};
         freeSampleExcluded[date][channel] = (freeSampleExcluded[date][channel] || 0) + 1;
       }
