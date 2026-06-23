@@ -77,9 +77,9 @@ function detectChannel(order: OrderWithAttribution): string {
   }
 
   // 3순위: source_name (플랫폼 직접 판매)
-  if (src === "tiktok") return "TikTok Shop";
-  if (src === "facebook") return "Facebook Shop";
-  if (src === "instagram") return "Instagram Shop";
+  if (src === "tiktok") return "TikTok";
+  if (src === "facebook") return "Facebook";
+  if (src === "instagram") return "Instagram";
   if (src === "pos") return "POS";
   if (src === "iphone" || src === "android") return "Mobile";
   if (/^\d+$/.test(src)) return "App";
