@@ -35,23 +35,55 @@ async function fetchAllOrders(since?: string, until?: string): Promise<OrderWith
   return results;
 }
 
+function getUTMSource(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).searchParams.get("utm_source")?.toLowerCase() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function detectChannel(order: OrderWithAttribution): string {
   const src = (order.source_name ?? "").toLowerCase();
   const ref = (order.referring_site ?? "").toLowerCase();
-  const land = (order.landing_site ?? "").toLowerCase();
-  const combined = `${src} ${ref} ${land}`;
+  const land = order.landing_site ?? "";
 
-  if (src === "tiktok" || combined.includes("tiktok")) return "TikTok";
-  if (src === "facebook" || combined.includes("facebook") || combined.includes("fb.com")) return "Facebook";
-  if (src === "instagram" || combined.includes("instagram")) return "Instagram";
-  if (src === "google" || combined.includes("google")) return "Google";
-  if (src === "email" || combined.includes("email") || combined.includes("klaviyo") || combined.includes("mailchimp")) return "Email";
-  if (src === "naver" || combined.includes("naver")) return "Naver";
-  if (combined.includes("linktr") || combined.includes("linktree")) return "Linktree";
-  if (src === "web" && !ref) return "Direct";
-  if (ref && !combined.includes("facebook") && !combined.includes("google") && !combined.includes("instagram")) return "Referral";
-  if (src === "web" || src === "online_store") return "Organic";
-  if (!src || src === "undefined") return "Direct";
+  // 1순위: UTM source (Shopify 어드민과 동일한 기준)
+  const utm = getUTMSource(land);
+  if (utm) {
+    if (utm.includes("facebook") || utm.includes("fb")) return "Facebook";
+    if (utm.includes("instagram") || utm === "ig") return "Instagram";
+    if (utm.includes("tiktok")) return "TikTok";
+    if (utm.includes("google")) return "Google";
+    if (utm.includes("naver")) return "Naver";
+    if (utm.includes("youtube")) return "YouTube";
+    if (utm.includes("klaviyo") || utm.includes("mailchimp") || utm.includes("email")) return "Email";
+    if (utm.includes("linktr") || utm.includes("linktree")) return "Linktree";
+    return utm.charAt(0).toUpperCase() + utm.slice(1);
+  }
+
+  // 2순위: 유입 도메인
+  if (ref) {
+    if (ref.includes("facebook.com") || ref.includes("fb.com") || ref.includes("m.facebook")) return "Facebook";
+    if (ref.includes("instagram.com")) return "Instagram";
+    if (ref.includes("tiktok.com") || ref.includes("tiktokcdn")) return "TikTok";
+    if (ref.includes("google.com") || ref.includes("google.co")) return "Google";
+    if (ref.includes("naver.com")) return "Naver";
+    if (ref.includes("youtube.com")) return "YouTube";
+    if (ref.includes("klaviyo.com") || ref.includes("mailchimp")) return "Email";
+    if (ref.includes("linktr.ee") || ref.includes("linktree")) return "Linktree";
+    return "Referral";
+  }
+
+  // 3순위: source_name (플랫폼 직접 판매)
+  if (src === "tiktok") return "TikTok Shop";
+  if (src === "facebook") return "Facebook Shop";
+  if (src === "instagram") return "Instagram Shop";
+  if (src === "pos") return "POS";
+  if (src === "iphone" || src === "android") return "Mobile";
+  if (/^\d+$/.test(src)) return "App";
+  if (src === "web" || src === "online_store" || !src || src === "undefined") return "Direct";
   return src.charAt(0).toUpperCase() + src.slice(1);
 }
 
